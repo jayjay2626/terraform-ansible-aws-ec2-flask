@@ -58,6 +58,31 @@ resource "aws_security_group" "flaskapp-sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  //  prometheus port 8001
+  ingress {
+    from_port   = 8001
+    to_port     = 8001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  //  grafana port 3000
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  // tired of adding exception but NOT best practices
+  //  open to all port which is not safe
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   // outbound
   egress {
     from_port   = 0
@@ -72,7 +97,7 @@ resource "aws_security_group" "flaskapp-sg" {
 resource "aws_instance" "flaskapp" {
   ami                     = "ami-03d315ad33b9d49c4"
   subnet_id               = local.subnet_id     //"subnet-acfa9df0"
-  instance_type           = "t2.micro"
+  instance_type           = "t2.large"
   key_name = local.key_name
   security_groups        = [aws_security_group.flaskapp-sg.id]
 
@@ -109,7 +134,17 @@ resource "aws_instance" "flaskapp" {
       "sudo apt install docker-ce -y",
       "sudo usermod -aG docker ubuntu",
       "echo 'Docker has been installed'",
-      "sudo docker run -it -p 5000:5000 --name rangeley826_flaskapp rangeley826/flaskapp"
+      #"sudo docker run -it -p 5000:5000 --name rangeley826_flaskapp rangeley826/flaskapp"
+
+      // installing microk8s
+      "sudo snap install microk8s --classic",
+      "sudo usermod -a -G microk8s ubuntu",
+      "sudo chown -f -R ubuntu ~/.kube",
+      "sudo microk8s.status --wait-ready",
+      "sudo microk8s.enable dashboard dns prometheus",
+      "sudo alias kubectl='microk8s kubectl' >> ~/.bash_aliases",
+      "sudo snap alias microk8s.kubectl kubectl",
+      "sudo microk8s.kubectl get all --all-namespaces"
     ]
   }
 
