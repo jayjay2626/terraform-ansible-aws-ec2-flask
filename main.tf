@@ -66,6 +66,15 @@ resource "aws_security_group" "flaskapp-sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+
+  //  prometheus port 9090
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   //  grafana port 3000
   ingress {
     from_port   = 3000
@@ -74,14 +83,14 @@ resource "aws_security_group" "flaskapp-sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  // tired of adding exception but NOT best practices
-  //  open to all port which is not safe
-  ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#   // tired of adding exception but NOT best practices
+#   //  open to all port which is not safe
+#   ingress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
   // outbound
   egress {
@@ -144,14 +153,23 @@ resource "aws_instance" "flaskapp" {
       "sudo microk8s.enable dashboard dns prometheus",
       "sudo alias kubectl='microk8s kubectl' >> ~/.bash_aliases",
       "sudo snap alias microk8s.kubectl kubectl",
+      "sleep 100 && sudo microk8s.status --wait-ready",
+
+      // deploying my own containerized app
+      "sudo docker run -it -d -p 5000:5000 --name rangeley826_flaskapp rangeley826/flaskapp",
+
       "sudo microk8s.kubectl get all --all-namespaces"
     ]
   }
 
+   provisioner "local-exec" {
+    command = "echo ${aws_instance.flaskapp.public_ip} > public_ip.txt"
+  }
+
+
 #   // local provisioner
 #   provisioner "local-exec" {
-#     #command = "ansible-playbook -i ${aws_instance.flaskapp.public_ip}, --private-key ${local.private_key_path} flaskapp_deployment.yaml"
-#     command = "docker run -it -p 5000:5000 --name rangeley826_flaskapp rangeley826/flaskapp "
+#     command = "ansible-playbook -i ${aws_instance.flaskapp.public_ip}, --private-key ${local.private_key_path} flaskapp_deployment.yaml"
 #   }
 
   tags = {
