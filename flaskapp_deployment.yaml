@@ -1,0 +1,24 @@
+---
+- name: Install Docker
+  hosts: all
+  remote_user: ubuntu
+  become: yes
+  become_user: root
+  vars:
+    #docker_compose_version: "1.27.4"
+    ansible_user: "ubuntu"
+
+  
+  roles:
+  - docker
+
+# - name: install Docker
+#   apt:
+#     name: docker.io
+#     state: present
+#     update_cache: true
+ 
+# - name: install APT Transport HTTPS
+#   apt:
+#     name: apt-transport-https
+#     state: present

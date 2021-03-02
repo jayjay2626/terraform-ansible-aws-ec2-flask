@@ -16,7 +16,7 @@ provider "aws" {
 resource "aws_security_group" "flaskapp-sg" {
   name        = "flaskapp-sg"
   description = "Allow ssh http https jenkins inbound traffic"
-  vpc_id = "local.vpc_id"
+  vpc_id = local.vpc_id
 
   // ssh port 22
   ingress {
@@ -50,6 +50,14 @@ resource "aws_security_group" "flaskapp-sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  // rangeley826_flaskapp port 5000
+  ingress {
+    from_port   = 5000
+    to_port     = 5000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   // outbound
   egress {
     from_port   = 0
@@ -69,23 +77,53 @@ resource "aws_instance" "flaskapp" {
   security_groups        = [aws_security_group.flaskapp-sg.id]
 
   provisioner "remote-exec" {
-    inline = ["echo 'Waiting until Docker is ready"]
-
+    
     connection {
         type            = "ssh"
         user            = local.ssh_user
         private_key     = file(local.private_key_path)
         host            = aws_instance.flaskapp.public_ip
+        #agent           = false
+        #timeout         = "2m"
     }
+
+    // install jenkins, docker, and soon kubernetes
+    inline = [
+      "sudo apt update && sudo apt upgrade -y",
+      "sudo apt install openjdk-11-jdk -y",
+      "wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -",
+      "sudo sh -c 'echo deb http://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'",
+      "sudo apt update && sudo apt install jenkins -y",
+      "sudo ufw allow 8080",
+      #"sudo ufw enable",
+      "sudo systemctl start jenkins",
+      //"sudo cat /var/lib/jenkins/secrets/initialAdminPassword >> jenkins_password.txt"
+      "echo 'Jenkins has been installed'",
+
+      // installing docker
+      "sudo apt update && sudo apt upgrade -y",
+      "sudo apt install apt-transport-https ca-certificates curl software-properties-common -y",
+      "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
+      "sudo add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable'",
+      "sudo apt update && sudo apt upgrade -y",
+      "sudo apt install docker-ce -y",
+      "sudo usermod -aG docker ubuntu",
+      "echo 'Docker has been installed'",
+      "sudo docker run -it -p 5000:5000 --name rangeley826_flaskapp rangeley826/flaskapp"
+    ]
   }
 
-  // local provisioner
-  provisioner "local-exec" {
-    command = "ansible-playbook -i ${aws_instance.flaskapp.public_ip}, --private-key ${local.private_key_path} docker.yaml"
+#   // local provisioner
+#   provisioner "local-exec" {
+#     #command = "ansible-playbook -i ${aws_instance.flaskapp.public_ip}, --private-key ${local.private_key_path} flaskapp_deployment.yaml"
+#     command = "docker run -it -p 5000:5000 --name rangeley826_flaskapp rangeley826/flaskapp "
+#   }
+
+  tags = {
+    Name = "flaskapp"
   }
 
 }
-
 
   output "flaskapp_public_ip" {
       value = aws_instance.flaskapp.public_ip
